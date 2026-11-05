@@ -1,0 +1,4 @@
+# automation-events authenticates scoped integration secrets inside the handler.
+# The existing analyze function continues to require Supabase JWT verification.
+[functions.automation-events]
+verify_jwt = false

@@ -1,0 +1,12 @@
+node_modules/
+.next/
+out/
+dist/
+.env*
+!.env.example
+.sites-runtime/
+.vercel/
+*.tsbuildinfo
+*.tar.gz
+*.zip
+qa/

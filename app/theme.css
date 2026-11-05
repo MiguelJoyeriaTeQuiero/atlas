@@ -1,0 +1,34 @@
+/* Color pairs in the workspace styles follow this single native color scheme. */
+:root { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
+:root {
+  --bg: light-dark(#f8f9fb, #11151c);
+  --surface: light-dark(#fff, #1a202b);
+  --ink: light-dark(#24252a, #e5eaf2);
+  --muted: light-dark(#737680, #a5afbf);
+  --line: light-dark(#e7e8ec, #303949);
+  --blue: light-dark(#007aff, #1674d6);
+  --blue-soft: light-dark(#eaf3ff, #20334d);
+  --green: light-dark(#24834b, #81c49b);
+  --green-soft: light-dark(#edf8f0, #1f352b);
+  --calendar-red: light-dark(#e84b47, #ff8c85);
+}
+body { background: light-dark(#f7f8fa, #11151c); }
+.main-shell { background: light-dark(#fff, #151a23); }
+.brand-symbol i { background: light-dark(#323b4b, #d8e2f3); }
+.modal-scrim { background: light-dark(#202a3f35, #03070fb8); }
+input, textarea, select { color: inherit; }
+select option { color: var(--ink); background: var(--surface); }
+.theme-picker { display: inline-flex; align-items: center; gap: 6px; padding: 0 8px; height: 30px; border: 1px solid var(--line); border-radius: 8px; color: var(--muted); background: var(--surface); flex-shrink: 0; }
+.theme-picker select { font-size: 11px; border: 0; background: transparent; padding: 3px 0; cursor: pointer; min-width: 65px; }
+.theme-picker:focus-within { outline: 2px solid light-dark(#007aff80, #89baff); outline-offset: 2px; }
+@media (max-width: 600px) {
+  .topbar-right { gap: 8px; }
+  .theme-picker { padding: 0 6px; gap: 4px; }
+  .theme-picker select { min-width: 60px; }
+}
+@media print {
+  :root { color-scheme: light !important; }
+  .theme-picker { display: none !important; }
+}
