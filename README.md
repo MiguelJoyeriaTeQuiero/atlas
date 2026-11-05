@@ -67,7 +67,7 @@ La base de datos usa revisiones optimistas. Si dos sesiones intentan modificar l
 
 ## Desplegar en Vercel
 
-Importar el repositorio o ejecutar el flujo oficial de despliegue desde la cuenta autorizada. Vercel reconoce Next.js. La configuración de `vercel.json` fija la compilación, `out/` y cabeceras básicas. Añadir las dos variables públicas y desplegar.
+Importar el repositorio o ejecutar el flujo oficial de despliegue desde la cuenta autorizada. Vercel reconoce Next.js. La configuración de `vercel.json` fija la compilación y cabeceras básicas. Mantener **Framework Preset: Next.js** y desactivar **Override** en **Output Directory** dentro de los ajustes de compilación de Vercel. Aunque la exportación estática genera `out/`, Vercel debe detectar la salida automáticamente: forzar `out` hace que busque allí `routes-manifest.json`, que se genera en `.next/`. Para usar Supabase, añadir las dos variables públicas antes de desplegar.
 
 Configurar los dominios autorizados en Supabase Auth. Realizar una prueba completa con las cuentas definitivas y un adjunto de ejemplo anonimizado. Confirmar que Dirección no puede modificar información. Comprobar que un usuario sin membresía no puede acceder al contenido aunque conozca la URL.
 
