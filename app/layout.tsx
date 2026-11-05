@@ -4,6 +4,7 @@ import './native.css';
 import './operations.css';
 import './jobs.css';
 import './theme.css';
+import './studio.css';
 export const metadata: Metadata = {
   title: 'ATLAS · Automatización y mejora operativa',
   description: 'Diagnóstico, prioridades y resultados medidos de Joyería Te Quiero y Te Quiero Metales.',

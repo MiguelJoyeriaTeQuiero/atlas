@@ -1,6 +1,8 @@
 /** ATLAS domain model. All monetary savings remain estimates until validated measurements exist. */
 import { validateOperations, validateBenefits, overlapWarnings, type ProcessOperations, type BenefitConfig } from './operations';
 import { validateJobDescription, type JobDescription } from './job-descriptions';
+import type { IntelligenceData } from './intelligence/types';
+import { validateIntelligence } from './intelligence/validation';
 export const COMPANIES = ['JTQ', 'TQM', 'Ambas'] as const;
 export type Company = (typeof COMPANIES)[number];
 export const DEPARTMENTS = [
@@ -34,6 +36,7 @@ export interface Baseline {
   minutesPerError: number; hourlyCost: number; capturedAt: string; source: string; validated: boolean;
 }
 export interface Process {
+  intelligenceSourceId?: string;
   jobTaskSource?: { documentId: string; taskId: string };
   operations?: ProcessOperations; benefits?: BenefitConfig;
   id: string; company: Company; departmentId: DepartmentId; name: string; owner: string;
@@ -51,6 +54,7 @@ export interface Session {
   participants: string[]; notes: string; decisions?: string; nextSteps?: string; status: 'planned' | 'completed'; processIds: string[]; createdAt: string; updatedAt: string;
 }
 export interface Evidence {
+  intelligence?: IntelligenceData;
   jobDescription?: JobDescription;
   id: string; processId?: string; sessionId?: string; departmentId?: DepartmentId; anonymized: boolean; name: string; type: 'document' | 'observation' | 'data' | 'interview';
   description: string; source: string; fileName?: string; storagePath?: string; mimeType?: string;
@@ -393,9 +397,23 @@ export function validateImport(input: unknown): ImportResult {
     for (const key of ['fileName', 'storagePath', 'mimeType']) if (e[key] !== undefined && typeof e[key] !== 'string') errors.push(`${path}.${key} debe ser texto.`);
     if (e.size !== undefined) numeric(e, ['size'], path);
     errors.push(...validateJobDescription(e.jobDescription, sessionIds));
+    errors.push(...validateIntelligence(e.intelligence));
+    if (isObject(e.intelligence)) {
+      const record = e.intelligence;
+      if (!deptIds.has(e.departmentId as string)) errors.push(`${path}: el registro necesita un departamento válido.`);
+      if (record.processId !== undefined && !processIds.has(record.processId as string)) errors.push(`${path}: el proceso de origen no existe.`);
+      if (record.kind === 'scenario' && Array.isArray(record.processIds) && record.processIds.some(id => !processIds.has(id as string))) errors.push(`${path}: el escenario contiene oportunidades inexistentes.`);
+    }
     if (e.jobDescription !== undefined && (!e.departmentId || e.type !== 'document' || e.mimeType !== 'application/pdf')) errors.push('Una descripción de puesto necesita departamento y archivo PDF.');
   });
   const jobSources = new Set<string>();
+  const intelligenceSources = new Set<string>();
+  if (Array.isArray(input.processes)) for (const p of input.processes) if (isObject(p) && p.intelligenceSourceId !== undefined) {
+    const source = Array.isArray(input.evidence) && input.evidence.find(e => isObject(e) && e.id === p.intelligenceSourceId);
+    if (!isObject(source) || !isObject(source.intelligence) || !['interview','finding'].includes(source.intelligence.kind as string)) errors.push('La fuente de descubrimiento de la oportunidad no existe.');
+    if (typeof p.intelligenceSourceId !== 'string' || intelligenceSources.has(p.intelligenceSourceId)) errors.push('Una fuente de descubrimiento solo puede tener una oportunidad vinculada.');
+    else intelligenceSources.add(p.intelligenceSourceId);
+  }
   if (Array.isArray(input.processes)) for (const p of input.processes) if (isObject(p) && p.jobTaskSource !== undefined) {
     const source = p.jobTaskSource;
     if (!isObject(source) || typeof source.documentId !== 'string' || typeof source.taskId !== 'string') { errors.push('El origen de la oportunidad no es válido.'); continue; }

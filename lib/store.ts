@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { createEmptyState, createProcess, validateImport, recommendation, calculateMetrics, type AtlasState, type Process, type Session, type Measurement, type Evidence, type Settings, type DepartmentId } from './domain';
 import { populateOperationsDemo } from './operations-demo';
+import { type StudioRecord } from './intelligence/types';
 import { AUTOMATION_LABELS, MAX_PDF_SIZE, isJobDocument, normalize, type JobDescription, type JobDocument, type JobTask } from './job-descriptions';
 
 type Mode = 'local' | 'cloud' | 'demo';
@@ -13,6 +14,7 @@ type Connection = { url: string; key: string; configured: boolean };
 const SETTINGS_ID = '00000000-0000-4000-8000-000000000001';
 const MAX_FILE = 50 * 1024 * 1024;
 let client: SupabaseClient | null = null;
+let clientConfig: { url: string; key: string } | null = null;
 let activeMember: Member | null = null;
 let dbPromise: Promise<IDBDatabase> | null = null;
 const stamp = () => new Date().toISOString();
@@ -25,7 +27,11 @@ function connectionConfig(): Connection {
 }
 function connect(config: Connection) {
   if (!config.configured) return null;
-  return createClient(config.url, config.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+  if (client && clientConfig?.url === config.url && clientConfig.key === config.key) return client;
+  if (client) void client.auth.stopAutoRefresh();
+  clientConfig = { url: config.url, key: config.key };
+  client = createClient(config.url, config.key, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+  return client;
 }
 function db(): Promise<IDBDatabase> {
   if (!dbPromise) dbPromise = new Promise((resolve, reject) => {
@@ -86,6 +92,18 @@ export async function analyzeProcess(process: Process): Promise<string> {
   if (error) throw new Error(`No se pudo generar la propuesta de IA. ${error.message}. Comprueba la función y las claves del proveedor.`);
   if (data?.error) throw new Error(data.error);
   return typeof data?.text === 'string' ? data.text : typeof data?.proposal === 'string' ? data.proposal : JSON.stringify(data, null, 2);
+}
+
+export async function requestIntelligence(operation: 'interview' | 'blueprint' | 'knowledge' | 'procedure' | 'transcribe', recordIds: string[], question = ''): Promise<{ text: string; sources?: { id: string; title: string; quote: string }[]; provider: string }> {
+  if (!client || !activeMember) throw new Error('Conecta el espacio compartido e inicia sesión para usar la IA. Puedes seguir trabajando con las herramientas locales.');
+  const { data, error } = await client.functions.invoke('intelligence', { body: { workspaceId: activeMember.workspaceId, operation, recordIds, question } });
+  if (error) {
+    let message = 'No se pudo conectar con el servicio de IA. Revisa su configuración y vuelve a intentarlo.';
+    if ('context' in error && error.context instanceof Response) { const body = await error.context.json().catch(() => null); if (typeof body?.message === 'string') message = body.message; }
+    throw new Error(message);
+  }
+  if (!data || typeof data.text !== 'string') throw new Error(data?.message || 'El servicio no devolvió una respuesta válida.');
+  return data;
 }
 
 export function useAtlas() {
@@ -224,7 +242,7 @@ export function useAtlas() {
   const deleteProcess = (id: string) => serialize(async () => {
     const s = stateRef.current;
     if (s.processes.some(p => p.operations?.links.some(l => l.targetId === id)) || s.processes.find(p => p.id === id)?.operations?.playbook?.rollouts.length) throw new Error('El proceso tiene relaciones o despliegues en tiendas. Conserva su historial cambiando su estado a Descartado.');
-    if (s.measurements.some(m => m.processId === id) || s.evidence.some(e => e.processId === id) || s.sessions.some(x => x.processIds.includes(id))) throw new Error('Este proceso tiene mediciones, evidencias o sesiones vinculadas. Desvincúlalas primero o cambia su estado a Descartado para conservar la trazabilidad.');
+    if (s.measurements.some(m => m.processId === id) || s.evidence.some(e => e.processId === id || (e.intelligence && 'processId' in e.intelligence && e.intelligence.processId === id) || (e.intelligence?.kind === 'scenario' && (e.intelligence.processIds.includes(id) || e.intelligence.dependencies.some(d => d.processId === id || d.requires.includes(id))))) || s.sessions.some(x => x.processIds.includes(id))) throw new Error('Este proceso tiene mediciones, evidencias o sesiones vinculadas. Desvincúlalas primero o cambia su estado a Descartado para conservar la trazabilidad.');
     await deleteEntity('process', id, { ...s, processes: s.processes.filter(p => p.id !== id), updatedAt: stamp() });
   });
   const deleteSession = (id: string) => serialize(async () => {
@@ -256,6 +274,7 @@ export function useAtlas() {
   });
   const deleteEvidence = (id: string) => serialize(async () => {
     assertAdmin(); const e = stateRef.current.evidence.find(x => x.id === id); if (!e) return;
+    if (stateRef.current.processes.some(p => p.intelligenceSourceId === id)) throw new Error('Este registro es el origen de una oportunidad. Consérvalo para mantener la trazabilidad.');
     if (stateRef.current.processes.some(p => p.jobTaskSource?.documentId === id)) throw new Error('Este documento es el origen de una oportunidad. Archívalo para conservar su trazabilidad.');
     // Removing metadata first prevents a failed DB write from producing a dangling visible attachment.
     await deleteEntity('evidence', id, { ...stateRef.current, evidence: stateRef.current.evidence.filter(x => x.id !== id), updatedAt: stamp() });
@@ -317,6 +336,31 @@ export function useAtlas() {
     await persist({ ...stateRef.current, processes: [...stateRef.current.processes, p], updatedAt: stamp() }, 'process', p, p.id);
     return p;
   });
+  const saveStudioRecord = (value: StudioRecord, expected?: string, file?: File) => serialize(async () => {
+    assertAdmin();
+    const previous = stateRef.current.evidence.find(e => e.id === value.id);
+    if (expected && !previous) throw new Error('Este registro ya no existe. Conserva el texto y actualiza la lista antes de continuar.');
+    if (previous && previous.intelligence?.updatedAt !== expected) throw new Error('Este registro cambió mientras lo editabas. Vuelve a abrirlo para revisar la última versión.');
+    if (!value.name.trim()) throw new Error('Escribe un título para guardar.');
+    const entity: StudioRecord = { ...value, intelligence: { ...value.intelligence, updatedAt: stamp() } };
+    if (file) {
+      if (file.size > 20 * 1024 * 1024) throw new Error('El archivo supera 20 MB. Divide la grabación o el documento.');
+      if (previous?.storagePath) throw new Error('Crea otro documento para sustituir el archivo original y conservar su trazabilidad.');
+      entity.fileName = file.name; entity.mimeType = file.type || 'application/octet-stream'; entity.size = file.size;
+      entity.storagePath = evidencePath(entity, modeRef.current === 'cloud' ? activeMember?.workspaceId : undefined);
+    }
+    const next = { ...stateRef.current, evidence: upsert(stateRef.current.evidence, entity), updatedAt: stamp() };
+    validState(next);
+    const storageMode = modeRef.current;
+    if (file && entity.storagePath) {
+      if (storageMode === 'cloud') { if (!client || !activeMember) throw new Error('Inicia sesión de nuevo.'); const { error } = await client.storage.from('atlas-evidence').upload(entity.storagePath, file, { contentType: entity.mimeType, upsert: false }); if (error) throw new Error('No se pudo guardar el archivo adjunto.'); }
+      else await writeLocal('blobs', `${storageMode}:${entity.storagePath}`, file);
+    }
+    try { await persist(next, 'evidence', entity, entity.id); }
+    catch (error) { if (file && entity.storagePath) { if (storageMode === 'cloud' && client) await client.storage.from('atlas-evidence').remove([entity.storagePath]); else await removeLocal('blobs', `${storageMode}:${entity.storagePath}`); } throw error; }
+    return entity;
+  });
+  const refreshStudio = () => serialize(async () => { if (modeRef.current === 'cloud' && activeMember) await loadCloud(activeMember); });
   const downloadEvidence = async (e: Evidence) => downloadBlob(await evidenceBlob(e, modeRef.current), e.fileName || e.name);
   const openEvidence = async (e: Evidence) => { const blob = await evidenceBlob(e, modeRef.current); const url = URL.createObjectURL(blob); window.open(url, '_blank', 'noopener,noreferrer'); setTimeout(() => URL.revokeObjectURL(url), 120000); };
 
@@ -405,5 +449,5 @@ export function useAtlas() {
   };
   const clearDemo = async () => { changeMode('local'); apply(await readLocal<AtlasState>('state', 'local') || createEmptyState()); setSyncStatus('Guardado en este navegador'); };
 
-  return { state, ready, mode, syncStatus, user, connection, saveProcess, deleteProcess, saveSession, deleteSession, saveMeasurement, deleteMeasurement, saveSettings, importMeasurements, addEvidence, deleteEvidence, addJobDocument, saveJobMetadata, saveJobTask, createJobOpportunity, downloadEvidence, openEvidence, exportBackup, importBackup, configureConnection, signIn, signOut, loadDemo, clearDemo, analyzeProcess, buildAIPrompt };
+  return { state, ready, mode, syncStatus, user, connection, saveProcess, deleteProcess, saveSession, deleteSession, saveMeasurement, deleteMeasurement, saveSettings, importMeasurements, addEvidence, deleteEvidence, addJobDocument, saveJobMetadata, saveJobTask, createJobOpportunity, saveStudioRecord, refreshStudio, requestIntelligence, downloadEvidence, openEvidence, exportBackup, importBackup, configureConnection, signIn, signOut, loadDemo, clearDemo, analyzeProcess, buildAIPrompt };
 }

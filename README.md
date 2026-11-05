@@ -8,6 +8,20 @@ Aplicación Next.js y React en español, diseñada para escritorio y móvil. Per
 
 El espacio inicial está vacío. La demostración se abre de forma explícita y utiliza un almacenamiento separado. Ninguna cifra ficticia se incorpora a los resultados reales.
 
+### Inteligencia operativa
+
+- **Entrevistas:** contexto de puesto, guía adaptativa, respuestas guardadas y revisión antes de crear una oportunidad. El enlace privado incorpora caducidad, revocación y control de cambios simultáneos.
+- **Hallazgos entre áreas:** coincidencias de tareas, recaptura de datos y responsables pendientes, siempre con fuentes y validación humana.
+- **Actividad real:** importación CSV con mapeo, control de duplicados, variantes, transiciones y separación entre tiempo transcurrido y trabajo activo.
+- **Propuestas:** pasos, dependencias, presupuestos y criterios revisables; traslado a Implantaciones sin duplicar tareas. Exportación de un piloto n8n desactivado.
+- **Seguimiento continuo:** historial de alertas y revisiones; función de servidor preparada para comprobaciones programadas y notificaciones por webhook.
+- **Simulador:** presupuesto, capacidad, adopción, crecimiento y dependencias, con supuestos guardados y cálculo orientativo explicable.
+- **Memoria operativa:** documentos, PDF, texto y grabaciones; procedimientos publicados con versiones y fuentes; consulta local y respuesta opcional con IA.
+
+Los siete módulos conservan sus datos en las copias ZIP existentes. La navegación está agrupada y los editores protegen los cambios sin guardar. Se revisaron escritorio y móvil, claro y oscuro, con vistas de 320 y 390 px y escritorio de 1280 px.
+
+**Activación pendiente:** la IA y transcripción, los enlaces para participantes y las comprobaciones sin navegador necesitan desplegar y configurar las funciones de Supabase. El código está preparado; publicar el frontend no las activa. Véase [conexión de inteligencia y seguimiento](public/documents/ATLAS_Inteligencia.md). No se han añadido facturación ni paquetes sectoriales.
+
 ### Ampliación operativa
 
 - **Mapa de procesos:** pasos ordenados por departamento, tiempos activos y esperas, traspasos, posibles recapturas de un dato y relaciones de entrada/salida entre procesos.

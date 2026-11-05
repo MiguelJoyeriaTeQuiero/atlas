@@ -38,6 +38,7 @@
   "exclude": [
     "node_modules",
     "supabase/functions",
+    "tests",
     ".sites-runtime",
     "out",
     "qa"

@@ -12,7 +12,8 @@
     "build": "node scripts/prepare-document-reader.mjs && next build --webpack",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx --test lib/domain.test.ts lib/operations.test.ts lib/job-descriptions.test.ts",
+    "typecheck:server": "tsc --noEmit --strict --skipLibCheck --target ES2022 --module esnext --moduleResolution bundler --allowImportingTsExtensions --lib esnext,dom tests/intelligence-server.test.ts",
+    "test": "node --import tsx --test lib/domain.test.ts lib/operations.test.ts lib/job-descriptions.test.ts lib/intelligence/intelligence.test.ts tests/intelligence-server.test.ts",
     "prepare:documents": "node scripts/prepare-document-reader.mjs"
   },
   "dependencies": {

@@ -1,2 +1,2 @@
-import AtlasApp from '@/components/AtlasApp';
-export default function Page() { return <AtlasApp />; }
+import AppEntry from '@/components/AppEntry';
+export default function Page() { return <AppEntry />; }

@@ -2,3 +2,14 @@
 # The existing analyze function continues to require Supabase JWT verification.
 [functions.automation-events]
 verify_jwt = false
+
+# Scoped, expiring interview secrets are checked and hashed in the handler.
+[functions.interview]
+verify_jwt = false
+
+# Cron requests must carry the dedicated server secret; browser requests are rejected.
+[functions.monitor]
+verify_jwt = false
+
+[functions.intelligence]
+verify_jwt = true
